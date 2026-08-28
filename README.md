@@ -18,11 +18,14 @@ pull warms the cache for every other node.
 
 ## Cluster this targets
 
-| Node | Role | IP | RAM | k3s |
-|---|---|---|---|---|
-| k3s-master01 | server | 192.168.8.102 | 16 GiB | v1.33.6+k3s1 |
-| k3s-node2-nuc | agent | 192.168.8.103 | 16 GiB | v1.33.6+k3s1 |
-| k3s-node3-debian | agent | 192.168.8.107 | 5.7 GiB | v1.34.3+k3s1 |
+| Node | Role | RAM | k3s |
+|---|---|---|---|
+| k3s-master01 | server | 16 GiB | v1.33.6+k3s1 |
+| k3s-node2-nuc | agent | 16 GiB | v1.33.6+k3s1 |
+| k3s-node3-debian | agent | 5.7 GiB | v1.34.3+k3s1 |
+
+Addresses, the MetalLB pool and the Prometheus endpoint all live in `.env`,
+which is gitignored. Nothing environment-specific is committed.
 
 MetalLB provides LoadBalancer services (`servicelb` is disabled in k3s config).
 Prometheus and Grafana run in-cluster, with the Prometheus OTLP receiver enabled.

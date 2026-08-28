@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: orca
   annotations:
     # PLACEHOLDER_LB_IP -- rewritten by scripts/02-deploy.sh from .env
-    metallb.universe.tf/loadBalancerIPs: 192.168.8.240
+    metallb.universe.tf/loadBalancerIPs: 10.0.0.10
 spec:
   type: LoadBalancer
   selector:
