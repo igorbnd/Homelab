@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: orca
+  namespace: orca
+  labels:
+    app.kubernetes.io/name: orca
+  annotations:
+    # PLACEHOLDER_LB_IP -- rewritten by scripts/02-deploy.sh from .env
+    metallb.universe.tf/loadBalancerIPs: 192.168.8.240
+spec:
+  type: LoadBalancer
+  selector:
+    app: orca
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP

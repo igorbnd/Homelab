@@ -1,0 +1,4 @@
+# Append to /etc/hosts on every node, OR add a wildcard *.orca.lan record
+# in your local DNS (AdGuard and Pi-hole both support this) pointing at the
+# MetalLB address. DNS is tidier; /etc/hosts is faster to get going.
+192.168.8.240 dockerhub.orca.lan k8s.orca.lan ghcr.orca.lan quay.orca.lan npmjs.orca.lan go.orca.lan

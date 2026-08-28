@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orca-config
+  namespace: orca
+  labels:
+    app.kubernetes.io/name: orca
+data:
+  config.yaml: |
+    # Varnish Orca -- free tier, memory-only cache.
+    # Cache size is governed by the pod memory limit x memory_target.
+    # There is no separate cache-size setting on the free tier: MSE4
+    # persistence is a Premium feature.
+
+    varnish:
+      http:
+      - port: 80
+      params:
+        memory_target: 75%
+        workspace_backend: 128k
+
+    otel:
+      service_name: orca
+      metrics:
+        enabled: true
+        exporter: otlp
+        protocol: http/protobuf
+        # PLACEHOLDER_PROM_OTLP -- rewritten by scripts/02-deploy.sh from .env
+        endpoint: http://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/otlp/v1/metrics
+        export_interval: 15
+        scrape_interval: 10
+
+    virtual_registry:
+      registries:
+      # The registry "name" is the subdomain label Orca routes on:
+      # dockerhub.orca.lan -> dockerhub, k8s.orca.lan -> k8s, and so on.
+      - name: dockerhub
+        default: true
+        remotes:
+        # fallback policy: mirror.gcr.io is only used if docker.io fails.
+        - url: https://docker.io
+        - url: https://mirror.gcr.io
+      - name: k8s
+        remotes:
+        - url: https://registry.k8s.io
+      - name: ghcr
+        remotes:
+        - url: https://ghcr.io
+      - name: quay
+        remotes:
+        - url: https://quay.io
+      - name: npmjs
+        remotes:
+        - url: https://registry.npmjs.org
+      - name: go
+        remotes:
+        - url: https://proxy.golang.org

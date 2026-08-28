@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orca
+  namespace: orca
+  labels:
+    app.kubernetes.io/name: orca
+spec:
+  # Deliberately 1. Free-tier Orca has no clustering, so each replica keeps an
+  # independent in-memory cache. Multiple replicas behind a round-robin Service
+  # fragment the cache and refetch the same blobs -- the "proxies without
+  # peering" anti-pattern. Scale out only with Premium clustering enabled.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: orca
+  template:
+    metadata:
+      labels:
+        app: orca
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                # node3 excluded: 5.7Gi RAM and a k3s version skew.
+                - k3s-master01
+                - k3s-node2-nuc
+      containers:
+      - name: orca
+        image: varnish/orca:latest
+        imagePullPolicy: IfNotPresent
+        args: ["--config", "/app/config.yaml"]
+        ports:
+        - name: http
+          containerPort: 80
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+          readOnly: true
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "250m"
+          limits:
+            memory: "4Gi"
+        readinessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 20
+      volumes:
+      - name: config
+        configMap:
+          name: orca-config

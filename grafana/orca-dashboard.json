@@ -1,0 +1,81 @@
+{
+  "title": "Varnish Orca — registry offload",
+  "uid": "orca-offload",
+  "tags": ["orca", "varnish", "registry"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Cache hit ratio",
+      "description": "Replace TODO_ metrics using scripts/06-discover-metrics.sh",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(TODO_cache_hit_total[5m])) / (sum(rate(TODO_cache_hit_total[5m])) + sum(rate(TODO_cache_miss_total[5m])))",
+          "legendFormat": "hit ratio"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Bytes served from cache vs fetched from origin",
+      "gridPos": { "h": 6, "w": 18, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "Bps" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(TODO_bytes_from_cache_total[5m]))",
+          "legendFormat": "from cache"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(TODO_bytes_from_origin_total[5m]))",
+          "legendFormat": "from origin"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Origin request rate",
+      "description": "Should drop sharply once the cache is warm",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (registry) (rate(TODO_backend_requests_total[5m]))",
+          "legendFormat": "{{registry}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Fetch latency — cache hit vs origin",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(TODO_hit_latency_bucket[5m])))",
+          "legendFormat": "p95 cache hit"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(TODO_origin_latency_bucket[5m])))",
+          "legendFormat": "p95 origin fetch"
+        }
+      ]
+    }
+  ]
+}
