@@ -7,16 +7,17 @@ rm -rf "$RENDER_DIR"; mkdir -p "$RENDER_DIR"
 cp "$REPO_ROOT"/manifests/*.yaml "$RENDER_DIR/"
 
 info "Rendering with ORCA_LB_IP=$ORCA_LB_IP"
-sed -i "s|metallb.universe.tf/loadBalancerIPs: .*|metallb.universe.tf/loadBalancerIPs: $ORCA_LB_IP|" "$RENDER_DIR/30-service.yaml"
+sed -i.bak "s|metallb.universe.tf/loadBalancerIPs: .*|metallb.universe.tf/loadBalancerIPs: $ORCA_LB_IP|" "$RENDER_DIR/30-service.yaml"
 
 info "Rendering with PROM_OTLP_ENDPOINT=$PROM_OTLP_ENDPOINT"
-sed -i "s|endpoint: http://prometheus-operated.*|endpoint: $PROM_OTLP_ENDPOINT|" "$RENDER_DIR/10-configmap.yaml"
+sed -i.bak "s|endpoint: http://prometheus-operated.*|endpoint: $PROM_OTLP_ENDPOINT|" "$RENDER_DIR/10-configmap.yaml"
 
 if [[ "$ORCA_NAMESPACE" != "orca" ]]; then
   info "Renaming namespace to $ORCA_NAMESPACE"
-  sed -i "s|namespace: orca|namespace: $ORCA_NAMESPACE|g; s|name: orca$|name: $ORCA_NAMESPACE|" "$RENDER_DIR/00-namespace.yaml"
-  sed -i "s|namespace: orca|namespace: $ORCA_NAMESPACE|g" "$RENDER_DIR"/{10,20,30}-*.yaml
+  sed -i.bak "s|namespace: orca|namespace: $ORCA_NAMESPACE|g; s|name: orca$|name: $ORCA_NAMESPACE|" "$RENDER_DIR/00-namespace.yaml"
+  sed -i.bak "s|namespace: orca|namespace: $ORCA_NAMESPACE|g" "$RENDER_DIR"/{10,20,30}-*.yaml
 fi
+rm -f "$RENDER_DIR"/*.bak
 
 info "Pre-pulling the Orca image on eligible nodes (avoids a chicken-and-egg on restart)"
 for node in $NODES; do

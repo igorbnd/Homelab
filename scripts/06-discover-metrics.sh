@@ -15,7 +15,7 @@ sleep 4
 
 info "Series with service_name=orca"
 curl -s 'http://127.0.0.1:19090/api/v1/label/__name__/values' \
-  | tr ',' '\n' | grep -iE 'varnish|orca|supervisor' | tr -d '"[]' | sort -u \
+  | tr ',' '\n' | grep -iE 'varnish|orca|supervisor|firewall|^"http_' | tr -d '"[]' | sort -u \
   | tee "$RESULTS_DIR/orca-metric-names.txt"
 
 echo

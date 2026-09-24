@@ -3,41 +3,30 @@ kind: ConfigMap
 metadata:
   name: orca-config
   namespace: orca
-  labels:
-    app.kubernetes.io/name: orca
 data:
   config.yaml: |
-    # Varnish Orca -- free tier, memory-only cache.
-    # Cache size is governed by the pod memory limit x memory_target.
-    # There is no separate cache-size setting on the free tier: MSE4
-    # persistence is a Premium feature.
-
     varnish:
       http:
       - port: 80
       params:
-        memory_target: 75%
+        # 60% of the 5Gi limit = 3Gi cache, same as before. The rest is headroom for
+        # the firewall: ~1.2Gi RSS with 228k OSV npm rules (measured), outside the cache.
+        memory_target: 60%
         workspace_backend: 128k
 
     otel:
       service_name: orca
       metrics:
         enabled: true
-        exporter: otlp
-        protocol: http/protobuf
-        # PLACEHOLDER_PROM_OTLP -- rewritten by scripts/02-deploy.sh from .env
-        endpoint: http://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/otlp/v1/metrics
-        export_interval: 15
-        scrape_interval: 10
+        exporter: prometheus
+        prometheus_host: 0.0.0.0
+        prometheus_port: 9464
 
     virtual_registry:
       registries:
-      # The registry "name" is the subdomain label Orca routes on:
-      # dockerhub.orca.lan -> dockerhub, k8s.orca.lan -> k8s, and so on.
       - name: dockerhub
         default: true
         remotes:
-        # fallback policy: mirror.gcr.io is only used if docker.io fails.
         - url: https://docker.io
         - url: https://mirror.gcr.io
       - name: k8s
@@ -46,12 +35,26 @@ data:
       - name: ghcr
         remotes:
         - url: https://ghcr.io
-      - name: quay
-        remotes:
-        - url: https://quay.io
       - name: npmjs
+        enable_firewall: true
         remotes:
         - url: https://registry.npmjs.org
-      - name: go
-        remotes:
-        - url: https://proxy.golang.org
+    firewall:
+      default_action: allow
+      mode: normal
+      audit_log_output: stdout
+      log_level: debug
+      rulesets:
+      - path: /etc/orca-rulesets
+      # Real advisories from OSV (osv.dev), regenerated hourly by Varnish.
+      # npm only for now: the file holds hundreds of thousands of rules.
+      - git:
+          name: osv-npm
+          url: https://github.com/varnish/osv-rules.git
+          ref: main
+          sub_path: rulesets/npm/all.yaml
+          interval: 1h
+          fetch_timeout: 120s
+
+    license: 
+      file: /etc/orca/license.lic 

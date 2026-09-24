@@ -4,12 +4,11 @@ metadata:
   name: orca
   namespace: orca
   labels:
-    app.kubernetes.io/name: orca
+    app: orca
 spec:
-  # Deliberately 1. Free-tier Orca has no clustering, so each replica keeps an
-  # independent in-memory cache. Multiple replicas behind a round-robin Service
-  # fragment the cache and refetch the same blobs -- the "proxies without
-  # peering" anti-pattern. Scale out only with Premium clustering enabled.
+  # Deliberately 1: free-tier Orca has no clustering, so each replica keeps an
+  # independent in-memory cache. More replicas behind a round-robin Service
+  # would fragment the cache and refetch the same blobs from origin.
   replicas: 1
   strategy:
     type: Recreate
@@ -20,6 +19,12 @@ spec:
     metadata:
       labels:
         app: orca
+      annotations:
+        # Picked up by the "kubernetes-pods" scrape job in prometheus-config —
+        # that job filters on these three pod annotations specifically.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9464"
+        prometheus.io/path: "/metrics"
     spec:
       affinity:
         nodeAffinity:
@@ -29,9 +34,10 @@ spec:
               - key: kubernetes.io/hostname
                 operator: In
                 values:
-                # node3 excluded: 5.7Gi RAM and a k3s version skew.
                 - k3s-master01
                 - k3s-node2-nuc
+                # k3s-node3-debian excluded: k3s version skew (v1.34.3 agent
+                # vs v1.33.6 server) — unsupported combination.
       containers:
       - name: orca
         image: varnish/orca:latest
@@ -40,17 +46,22 @@ spec:
         ports:
         - name: http
           containerPort: 80
+        - name: metrics
+          containerPort: 9464
         volumeMounts:
         - name: config
           mountPath: /app/config.yaml
           subPath: config.yaml
           readOnly: true
+        - name: rulesets
+          mountPath: /etc/orca-rulesets
+          readOnly: true
         resources:
           requests:
-            memory: "2Gi"
+            memory: "3Gi"
             cpu: "250m"
           limits:
-            memory: "4Gi"
+            memory: "5Gi"
         readinessProbe:
           tcpSocket:
             port: 80
@@ -65,3 +76,6 @@ spec:
       - name: config
         configMap:
           name: orca-config
+      - name: rulesets
+        configMap:
+          name: orca-firewall-rulesets

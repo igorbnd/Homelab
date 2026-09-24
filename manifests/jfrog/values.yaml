@@ -1,0 +1,51 @@
+# Helm values for jfrog/artifactory (chart repo: https://charts.jfrog.io).
+# JFrog's own docs point to this Helm chart as the supported self-hosted install
+# path -- see results/notes.md 2026-09-24. Not hand-rolled manifests like Orca/Nexus:
+# Artifactory needs a real DB and init logic the chart already handles correctly.
+#
+# License is NOT in this file. scripts/jfrog/00-deploy.sh creates a Secret from a
+# local *.lic file (gitignored) and passes --set artifactory.license.secret/dataKey.
+#
+# Everything pinned to k3s-master01: most memory headroom of the two eligible
+# nodes (see results/notes.md 2026-09-24 resource check), and local-path storage
+# (not Longhorn) so PVCs stay node-local -- this is throwaway comparison data,
+# not something that needs replication, and node3's small disk makes Longhorn's
+# default 3-way replica placement a bad fit anyway.
+
+global:
+  nodeSelector:
+    kubernetes.io/hostname: k3s-master01
+
+artifactory:
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2"
+  javaOpts:
+    xms: "1g"
+    xmx: "3g"
+  persistence:
+    storageClassName: local-path
+    size: 20Gi
+
+nginx:
+  service:
+    type: LoadBalancer
+    # LB IP is NOT set here -- scripts/jfrog/00-deploy.sh passes it via
+    # --set nginx.service.annotations."metallb\.universe\.tf/loadBalancerIPs"=$JFROG_LB_IP
+    # so no real IP ever needs to live in this checked-in file.
+  persistence:
+    storageClassName: local-path
+
+postgresql:
+  primary:
+    nodeSelector:
+      kubernetes.io/hostname: k3s-master01
+    persistence:
+      storageClassName: local-path
+      # Chart default is 200Gi, meant for production. This is a lab trial.
+      size: 20Gi
+    resourcesPreset: "small"

@@ -92,11 +92,42 @@ names to make the dashboard look finished.**
 
 ## Current state
 
-Manifests and scripts are written and validated but **not yet run against the
-cluster**. Nothing has been deployed.
+Orca is deployed and has been running in the `orca` namespace on `k3s-node2-nuc` for
+several days. Firewall testing against the `npmjs` registry is well underway — see
+`results/notes.md` (2026-09-19 entries) for confirmed findings: the Artifact Firewall
+does not evaluate OCI/Docker traffic at all, has a reproducible parsing bug on
+hyphenated npm package names that lets a matching deny rule slip through at the
+tarball-request step, and there's a short startup window where the OSV ruleset hasn't
+finished loading yet (~3s) during which traffic defaults to allow. ~228k real OSV
+advisories load from `github.com/varnish/osv-rules` (npm) and refresh hourly.
 
-Next step: `scripts/00-preflight.sh`, then fill in `.env`, then
-`scripts/01-baseline.sh`.
+Not yet done: the Grafana dashboard is still the 4-panel cache-only skeleton with
+`TODO_` markers (no firewall panels), and the JFrog/Nexus comparison track (see
+"Comparison scope" below) hasn't started.
+
+## Comparison scope
+
+Beyond Orca alone, the interview goal now includes being able to speak from hands-on
+experience about JFrog Artifactory and Sonatype Nexus as points of comparison — not to
+become an expert in either, just enough for a credible "I tried it, here's how it
+compares" narrative. Decisions locked in for this track (see the full plan for detail):
+
+- **No containerd wiring for JFrog/Nexus.** Orca stays the only tool wired into
+  `registries.yaml` (k3s only supports one mirror endpoint set per upstream, and
+  restarting k3s is already flagged above as the riskiest step in this repo). JFrog and
+  Nexus get their own Service + subdomain, benchmarked with direct `docker pull`/`skopeo`
+  against their Docker-remote endpoint.
+- **JFrog = self-hosted trial** (`artifactory-pro` image, license from
+  jfrog.com/start-free) — the free `artifactory-oss` image cannot proxy Docker at all.
+- **Nexus = Nexus Repository OSS 3** (`sonatype/nexus3`) — genuinely free, no trial
+  needed, supports Docker-proxy and npm-proxy out of the box.
+- Comparison covers Docker image caching **and** npm caching (same test packages as the
+  Orca firewall work: `ms`, `left-pad`, `minimist`).
+- No fake parity for Orca's Artifact Firewall — Nexus OSS has nothing built-in, JFrog's
+  Xray scanner is a separate product not guaranteed to be in the trial. Confirm what's
+  actually enabled before claiming a comparison.
+- New dirs follow the existing manifest/script numbering convention:
+  `manifests/jfrog/`, `manifests/nexus/`, `scripts/jfrog/`, `scripts/nexus/`.
 
 ## Run order
 
