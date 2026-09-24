@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Homelab Infrastructure Dashboard | Igor Bond</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #13171f;
+            --bg-card: #1a1f2a;
+            --accent-primary: #00d9ff;
+            --accent-secondary: #7c3aed;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-tertiary: #6e7681;
+            --border: #2d333b;
+            --success: #3fb950;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background grid */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0.3;
+            z-index: 0;
+            animation: gridScroll 20s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes gridScroll {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 4rem 2rem 3rem;
+            margin-bottom: 3rem;
+            position: relative;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .terminal-prefix {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--accent-primary);
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            max-width: 700px;
+            margin: 0 auto 2rem;
+        }
+
+        .tech-stack {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            margin-top: 2rem;
+        }
+
+        .tech-badge {
+            padding: 0.4rem 0.8rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .tech-badge:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            transform: translateY(-2px);
+        }
+
+        /* Services Grid */
+        .services-section {
+            margin-bottom: 4rem;
+        }
+
+        .section-title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--accent-primary);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title::before {
+            content: '>';
+            color: var(--accent-primary);
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            animation: fadeIn 1s ease-out 0.3s both;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .service-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            animation: fadeIn 0.6s ease-out both;
+        }
+
+        .service-card:nth-child(1) { animation-delay: 0.1s; }
+        .service-card:nth-child(2) { animation-delay: 0.2s; }
+        .service-card:nth-child(3) { animation-delay: 0.3s; }
+        .service-card:nth-child(4) { animation-delay: 0.4s; }
+        .service-card:nth-child(5) { animation-delay: 0.5s; }
+        .service-card:nth-child(6) { animation-delay: 0.6s; }
+
+        .service-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.1), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .service-card:hover::before {
+            left: 100%;
+        }
+
+        .service-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-lg), 0 0 30px rgba(0, 217, 255, 0.2);
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .service-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .service-card:hover .service-icon {
+            transform: rotate(5deg) scale(1.1);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--success);
+            padding: 0.3rem 0.6rem;
+            background: rgba(63, 185, 80, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .access-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.7rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .access-public {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .access-private {
+            background: rgba(251, 146, 60, 0.1);
+            color: #fb923c;
+            border: 1px solid rgba(251, 146, 60, 0.3);
+        }
+
+        .service-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .service-description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .service-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .service-type {
+            color: var(--text-tertiary);
+        }
+
+        .service-link {
+            color: var(--accent-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            transition: gap 0.3s ease;
+        }
+
+        .service-card:hover .service-link {
+            gap: 0.6rem;
+        }
+
+        .service-link::after {
+            content: '→';
+            transition: transform 0.3s ease;
+        }
+
+        .service-card:hover .service-link::after {
+            transform: translateX(3px);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            border-top: 1px solid var(--border);
+            margin-top: 4rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent-primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            header {
+                padding: 2rem 1rem;
+            }
+
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tech-stack {
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="terminal-prefix">$ kubectl get services --namespace homelab</div>
+            <h1>My Homelab Infrastructure Dashboard</h1>
+            <p class="subtitle">Real-time access to production-grade Kubernetes cluster services<br>Built with K3s, Traefik, and modern DevOps practices</p>
+            <div class="tech-stack">
+                <span class="tech-badge">K3s v1.33</span>
+                <span class="tech-badge">Traefik</span>
+                <span class="tech-badge">MetalLB</span>
+                <span class="tech-badge">Longhorn</span>
+                <span class="tech-badge">Prometheus</span>
+                <span class="tech-badge">Grafana</span>
+            </div>
+        </header>
+
+        <section class="services-section">
+            <h2 class="section-title">Deployed Services</h2>
+            <div class="services-grid" id="servicesGrid">
+                <!-- Services will be dynamically generated -->
+            </div>
+        </section>
+
+        <footer>
+            <p>Cloud Engineer & DevOps Specialist</p>
+            <p style="margin-top: 0.5rem;">
+                <a href="mailto:admin@igorbond.com" style="color: var(--accent-primary); text-decoration: none;">admin@igorbond.com</a>
+            </p>
+            <div class="footer-links">
+                <a href="https://igorbond.com" target="_blank">Portfolio</a>
+                <a href="https://linkedin.com/in/igorbondarenko" target="_blank">LinkedIn</a>
+                <a href="https://github.com/bil-12" target="_blank">GitHub</a>
+            </div>
+            <p style="margin-top: 1rem; opacity: 0.6;">Disclaimer: Since the homelab infrastructure and services are intended for personal use, their maintenance and availability are not guaranteed 24/7, despite being based on a high-availability k3s architecture. If you have any questions or concerns, please contact the administrator.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Service definitions - easy to expand
+
+        const services = [
+            {
+                name: 'Linkding',
+                description: 'Self-hosted bookmark manager with tagging and full-text search. Privacy-focused alternative to cloud bookmark services. All are welcome to use this service!',
+                icon: '🔗',
+                type: 'Productivity',
+                url: 'https://linkding.igorbond.info',
+              //  status: 'online',
+                access: 'public'
+            },
+            {
+                name: 'Grafana',
+                description: 'Real-time infrastructure monitoring and observability platform. Visualises metrics from Prometheus and Loki.',
+                icon: '📊',
+                type: 'Monitoring',
+                url: 'https://grafana.igorbond.info',
+           //     status: 'online',
+                access: 'private'
+            },
+            {
+                name: 'Frigate',
+                description: 'AI-powered CCTV and NVR system with object detection. Real-time video processing with event recording.',
+                icon: '🎥',
+                type: 'Security',
+                url: 'https://cctv.igorbond.info',
+            //    status: 'online',
+                access: 'private'
+            }
+        ];
+
+        // Render services
+        function renderServices() {
+            const grid = document.getElementById('servicesGrid');
+            
+            services.forEach(service => {
+                const card = document.createElement('a');
+                card.href = service.url;
+                card.target = '_blank';
+                card.className = 'service-card';
+                card.style.textDecoration = 'none';
+                
+                const accessBadgeClass = service.access === 'public' ? 'access-public' : 'access-private';
+                const accessLabel = service.access === 'public' ? '🌐 Public Access' : '🔒 Authorised Users Only';
+                
+                card.innerHTML = `
+                    <div class="service-header">
+                        <div class="service-icon">${service.icon}</div>
+                        <div class="status-indicator">
+                            <span class="status-dot"></span>
+                            <span>${service.status}</span>
+                        </div>
+                    </div>
+                    <h3 class="service-name">${service.name}</h3>
+                    <p class="service-description">${service.description}</p>
+                    <div class="access-badge ${accessBadgeClass}">${accessLabel}</div>
+                    <div class="service-meta">
+                        <span class="service-type">${service.type}</span>
+                        <span class="service-link">Access</span>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', renderServices);
+
+        // Backlog: add service health checking
+        async function checkServiceHealth() {
+            // Placeholder for future API integration
+            // Will fetch from monitoring API to show real status
+            console.log('Service health check would run here');
+        }
+
+        // Run health check every 60 seconds
+        // setInterval(checkServiceHealth, 60000);
+    </script>
+</body>
+</html>
