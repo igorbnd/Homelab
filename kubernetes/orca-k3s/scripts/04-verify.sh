@@ -43,7 +43,7 @@ echo "If it is absent, an Orca outage means pulls fail rather than falling back.
 
 echo
 info "6. OTLP metrics export"
-kubectl -n "$ORCA_NAMESPACE" logs deploy/orca --tail=200 2>/dev/null | grep -i -E 'otel|metric|export' | tail -10 \
+kubectl -n "$ORCA_NAMESPACE" logs statefulset/orca --tail=200 2>/dev/null | grep -i -E 'otel|metric|export' | tail -10 \
   || warn "no otel lines in the log yet -- give it one export_interval"
 
 echo
