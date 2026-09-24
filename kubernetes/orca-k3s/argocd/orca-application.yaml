@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orca
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/igorbnd/Homelab.git
+    targetRevision: main
+    path: kubernetes/orca-k3s/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: orca
+  syncPolicy:
+    # Manual, deliberately -- not automated/self-heal yet. This is freshly built
+    # (clustering + persistence went live 2026-09-24, one open caveat from the
+    # resilience test not yet explained -- see results/notes.md). Auto-sync now
+    # would mean any manual kubectl debugging during that investigation gets
+    # silently reverted by ArgoCD mid-session. Revisit once a few manual syncs
+    # build confidence -- see CLAUDE.md.
+    syncOptions:
+    - CreateNamespace=false
+  ignoreDifferences:
+  # ORCA_LB_IP is a real per-environment value (this homelab's MetalLB pool) that
+  # CLAUDE.md's own rule says never gets committed to git -- the checked-in
+  # manifest has a placeholder (10.0.0.10). scripts/02-deploy.sh sets the real
+  # annotation once; ArgoCD must not fight that by reverting it to the
+  # placeholder on every sync. Same reasoning as excluding the two Secrets
+  # (orca-license, orca-cluster-token) entirely -- this is the one field that
+  # can't be excluded that way because it lives on a resource ArgoCD does own.
+  - group: ""
+    kind: Service
+    name: orca
+    namespace: orca
+    jsonPointers:
+    - /metadata/annotations/metallb.universe.tf~1loadBalancerIPs

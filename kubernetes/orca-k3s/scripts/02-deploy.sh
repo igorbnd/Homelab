@@ -12,10 +12,6 @@ sed -i.bak "s|metallb.universe.tf/loadBalancerIPs: .*|metallb.universe.tf/loadBa
 info "Rendering with PROM_OTLP_ENDPOINT=$PROM_OTLP_ENDPOINT"
 sed -i.bak "s|endpoint: http://prometheus-operated.*|endpoint: $PROM_OTLP_ENDPOINT|" "$RENDER_DIR/10-configmap.yaml"
 
-info "Rendering cluster.token (never committed -- see results/notes.md 2026-09-24)"
-CLUSTER_TOKEN="${CLUSTER_TOKEN:-$(openssl rand -hex 24)}"
-sed -i.bak "s|token: PLACEHOLDER_CLUSTER_TOKEN|token: $CLUSTER_TOKEN|" "$RENDER_DIR/10-configmap.yaml"
-
 if [[ "$ORCA_NAMESPACE" != "orca" ]]; then
   info "Renaming namespace to $ORCA_NAMESPACE"
   sed -i.bak "s|namespace: orca|namespace: $ORCA_NAMESPACE|g; s|name: orca$|name: $ORCA_NAMESPACE|" "$RENDER_DIR/00-namespace.yaml"
@@ -38,6 +34,21 @@ if ! kubectl -n "$ORCA_NAMESPACE" get secret orca-license >/dev/null 2>&1; then
   ok "created orca-license Secret from $LICENSE_FILE"
 else
   ok "orca-license Secret already exists, leaving it alone"
+fi
+
+if ! kubectl -n "$ORCA_NAMESPACE" get secret orca-cluster-token >/dev/null 2>&1; then
+  # Not git-tracked, not owned by ArgoCD/Kustomize (absent from manifests/
+  # kustomization.yaml entirely) -- same out-of-band pattern as orca-license.
+  # See results/notes.md 2026-09-24 for why this couldn't just be a field in
+  # the ConfigMap (cluster.token has no file/env-ref alternative), and for the
+  # confirmed-safe fix (Orca deep-merges multiple --config files).
+  CLUSTER_TOKEN="${CLUSTER_TOKEN:-$(openssl rand -hex 24)}"
+  kubectl -n "$ORCA_NAMESPACE" create secret generic orca-cluster-token \
+    --from-literal="cluster-secret.yaml=cluster:
+  token: $CLUSTER_TOKEN"
+  ok "created orca-cluster-token Secret"
+else
+  ok "orca-cluster-token Secret already exists, leaving it alone"
 fi
 
 info "Applying config, cluster networking, and the StatefulSet"
