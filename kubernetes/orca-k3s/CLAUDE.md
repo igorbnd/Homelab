@@ -33,7 +33,7 @@ doesn't apply.
 ## Repository layout
 
 ```
-manifests/     Namespace, ConfigMap, Deployment, Service
+manifests/     Namespace, ConfigMap, StatefulSet, headless + LoadBalancer Service
 node/          registries.yaml and hosts entries to install on the nodes
 scripts/       Numbered, run in order; 99-rollback.sh undoes everything
 grafana/       Dashboard skeleton — queries are TODO placeholders by design
@@ -65,22 +65,43 @@ carries risk before the interview.
 
 These are deliberate and each has a reason worth being able to defend.
 
-**Single replica, not a DaemonSet or multi-replica Deployment.** Free-tier Orca has
-no clustering. Each replica keeps an independent in-memory cache, so extra replicas
-fragment the cache and refetch the same blobs — recreating the "proxies without
-peering" anti-pattern Orca exists to solve. A DaemonSet is worse for the same reason.
-One replica maximises hit ratio at the cost of availability. The production answer is
-Premium clustering (`enable_cluster` plus `cluster.peers`).
+**2-replica StatefulSet with Premium clustering, not single-replica.** SUPERSEDES the
+original single-replica decision (2026-08-28) — kept here for the reasoning trail, not
+as current practice. The original problem was real: free-tier Orca has no clustering,
+each replica keeps an independent in-memory cache, so extra replicas fragment the cache
+and refetch the same blobs — the "proxies without peering" anti-pattern Orca exists to
+solve. That problem goes away once clustering is genuinely licensed and enabled
+(confirmed 2026-09-24: `addons: sup-clustering` in `license.lic`, verified live via the
+boot log — `License: Nodes clustering enabled` — not just claimed). With
+`enable_cluster: true` and `cluster.peers`, either replica can serve any cached object,
+proxied through the mesh if it doesn't hold it locally, so 2 replicas no longer
+fragments anything — it's what makes the resilience demo (kill one pod, the other still
+serves) actually real instead of aspirational. Still capped at 2, matching the 2 nodes
+eligible for Orca (node3 stays excluded — version skew, unchanged). A DaemonSet remains
+a bad idea for the same original reason (no upper bound on fragmentation, and now no
+bound on cluster peer count either). StatefulSet, not Deployment, because clustering's
+static `peers` list needs stable per-pod network identity — Orca has no Kubernetes-native
+peer discovery, only a static list or EC2 auto-discovery — which only a StatefulSet's
+predictable pod names + a headless Service actually provide.
 
 **Subdomain routing.** Orca routes on the first label of the Host header, matched
 against the registry `name`. `dockerhub.orca.lan` → registry named `dockerhub`.
 One Service, one address, one hostname per upstream. DNS or `/etc/hosts` entries are
 therefore mandatory, not optional.
 
-**Cache sizing via memory limit.** No cache-size setting exists on the free tier.
-The cache is in-memory, governed by the pod memory limit × `memory_target` (4 GiB ×
-75% ≈ 3 GiB usable). MSE4 persistence is Premium. A pod restart empties the cache —
-expected, not a bug.
+**Hybrid RAM + MSE4 disk cache, not memory-only.** SUPERSEDES the original memory-only
+decision — kept here for the reasoning trail. The original constraint was real: no
+cache-size setting exists on the free tier, so sizing was pod memory limit ×
+`memory_target` only (5 GiB × 60% ≈ 3 GiB), and a pod restart emptied the cache, which
+was "expected, not a bug" because there was no alternative. MSE4 persistence
+(`addons: sup-persistence`, confirmed licensed the same way clustering was) removes that
+constraint: `varnish.storage.stores` adds a disk-backed store (currently 15G,
+deliberately bigger than the RAM cache — the actual point of MSE4 is extending the cache
+past available memory, not merely surviving a restart) via a `local-path` PVC per
+StatefulSet replica. `memory_target` still governs the RAM tier and still auto-adjusts to
+the pod's real cgroup limit at startup regardless of the literal value written in
+config — confirmed in the boot log, not assumed. A restart no longer empties everything;
+verify this is actually true after deploying rather than trusting the docs' claim.
 
 **Two remotes on dockerhub.** `docker.io` then `mirror.gcr.io`, using the default
 `fallback` policy. Free resilience and a good illustration of the remotes model.
@@ -92,18 +113,31 @@ names to make the dashboard look finished.**
 
 ## Current state
 
-Orca is deployed and has been running in the `orca` namespace on `k3s-node2-nuc` for
-several days. Firewall testing against the `npmjs` registry is well underway — see
-`results/notes.md` (2026-09-19 entries) for confirmed findings: the Artifact Firewall
-does not evaluate OCI/Docker traffic at all, has a reproducible parsing bug on
-hyphenated npm package names that lets a matching deny rule slip through at the
-tarball-request step, and there's a short startup window where the OSV ruleset hasn't
-finished loading yet (~3s) during which traffic defaults to allow. ~228k real OSV
-advisories load from `github.com/varnish/osv-rules` (npm) and refresh hourly.
+Orca runs as a 2-replica StatefulSet (`orca-0` on `k3s-node2-nuc`, `orca-1` on
+`k3s-master01`) with Premium clustering and MSE4 persistence both live — see "Design
+decisions" above for why, and `results/notes.md` (2026-09-24 entries) for how it was
+verified: license genuinely covers `sup-clustering`/`sup-persistence` (not just claimed),
+persistence confirmed via a real pod restart (`Revived 16 objects`, then a 10x-faster
+refetch of the same blob), cluster resilience confirmed by force-killing one replica and
+still getting served from the survivor. One open item from that session: the
+client-facing LoadBalancer was slow once through a freshly-recreated peer, not yet
+explained (restart-timing artifact vs. a real replication gap) — don't claim
+"zero-latency-impact failover" until that's resolved.
 
-Not yet done: the Grafana dashboard is still the 4-panel cache-only skeleton with
-`TODO_` markers (no firewall panels), and the JFrog/Nexus comparison track (see
-"Comparison scope" below) hasn't started.
+Firewall testing against the `npmjs` registry found several confirmed, reproducible
+bugs (`results/notes.md`, 2026-09-19 and 2026-09-24 entries): the Artifact Firewall
+doesn't evaluate OCI/Docker traffic at all; a parsing bug on hyphenated npm package
+names lets a matching deny rule slip through at the tarball-request step; a false
+positive blocks a currently-patched `node-forge` version citing a CVE fixed 4 majors
+earlier, breaking an entire `create-react-app` install; every documented malicious-npm
+incident tried (2018 through a May 2026 credential-stealer) had already been scrubbed
+from the live registry by npm's own security team before it could be tested. ~228k real
+OSV advisories load from `github.com/varnish/osv-rules` (npm) and refresh hourly.
+
+Grafana dashboard (`grafana/orca-dashboard.json`) has all 7 panels wired to real,
+live-verified metric names — no `TODO_` markers. The JFrog/Nexus comparison track (see
+"Comparison scope" below): Nexus is fully deployed, configured, and benchmarked; JFrog
+is scaffolded via its official Helm chart but blocked on obtaining a trial license.
 
 ## Comparison scope
 
@@ -206,9 +240,14 @@ Minimum viable, in priority order:
 
 Stretch, only if items 1–4 are complete:
 
-5. Resilience demo (upstream blocked, pull still succeeds)
+5. ~~Resilience demo~~ **Done, 2026-09-24** — not the original origin-outage version,
+   the sharper Premium version: killed one cluster replica outright, the survivor kept
+   serving previously-cached content. See `results/notes.md` for the one open caveat
+   (LB-path recovery timing not yet explained).
 6. npm or Helm chart caching through Orca, proving it isn't images-only
 7. HTTPS listener with a self-signed certificate
+8. **New:** MSE4 persistence demo (pod restart, cache survives) — **done, 2026-09-24**,
+   see "Current state" and `results/notes.md`. This one's unambiguous, unlike #5's caveat.
 
 If only item 1 lands, there is still something real to talk about. Don't sacrifice a
 working demo for a longer feature list.

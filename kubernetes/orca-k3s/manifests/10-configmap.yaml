@@ -9,10 +9,23 @@ data:
       http:
       - port: 80
       params:
-        # 60% of the 5Gi limit = 3Gi cache, same as before. The rest is headroom for
-        # the firewall: ~1.2Gi RSS with 228k OSV npm rules (measured), outside the cache.
+        # 60% of the 6Gi limit = ~3.6Gi RAM cache. The rest is headroom for the
+        # firewall (~1.2Gi RSS at 228k OSV rules, measured) and MSE4 metadata.
+        # memory_target auto-adjusts to the real cgroup limit at startup regardless
+        # of what's written here -- confirmed in results/notes.md 2026-09-24.
         memory_target: 60%
         workspace_backend: 128k
+      storage:
+        # MSE4 persisted storage (Premium, licensed -- addons: sup-persistence).
+        # 15G on disk, bigger than the RAM cache: this is the actual point of MSE4 --
+        # extend the cache past available memory, not just survive a restart.
+        # size must be > book_size + 1G filesystem overhead -- validated on a
+        # throwaway pod first, see results/notes.md 2026-09-24.
+        stores:
+        - name: mse-store
+          path: /var/lib/orca-mse
+          size: 15G
+          book_size: 5G
 
     otel:
       service_name: orca
@@ -22,20 +35,39 @@ data:
         prometheus_host: 0.0.0.0
         prometheus_port: 9464
 
+    # Premium clustering (addons: sup-clustering). token is templated in by
+    # scripts/02-deploy.sh at deploy time -- never commit a real value, same
+    # pattern as PROM_OTLP_ENDPOINT and the LB IP. peers use the headless
+    # Service's stable per-pod DNS names (manifests/25-headless-service.yaml),
+    # which only exist because Orca is a StatefulSet, not a Deployment, now.
+    # storage_replicas: 2 = full replication across both peers -- with only 2
+    # nodes eligible (node3 excluded, version skew), this is what makes the
+    # resilience demo (kill one pod, other still serves cached content) real.
+    cluster:
+      token: PLACEHOLDER_CLUSTER_TOKEN
+      storage_replicas: 2
+      peers:
+      - url: http://orca-0.orca-cluster.orca.svc.cluster.local:80
+      - url: http://orca-1.orca-cluster.orca.svc.cluster.local:80
+
     virtual_registry:
       registries:
       - name: dockerhub
         default: true
+        enable_cluster: true
         remotes:
         - url: https://docker.io
         - url: https://mirror.gcr.io
       - name: k8s
+        enable_cluster: true
         remotes:
         - url: https://registry.k8s.io
       - name: ghcr
+        enable_cluster: true
         remotes:
         - url: https://ghcr.io
       - name: npmjs
+        enable_cluster: true
         enable_firewall: true
         remotes:
         - url: https://registry.npmjs.org

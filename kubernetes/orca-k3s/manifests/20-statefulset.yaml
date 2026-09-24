@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: orca
+  namespace: orca
+  labels:
+    app: orca
+spec:
+  # 2 replicas, Premium clustering (addons: sup-clustering, licensed -- verified
+  # 2026-09-24). This SUPERSEDES the old single-replica free-tier reasoning: with
+  # clustering, either replica can serve any cached object (proxied through the
+  # mesh if it doesn't hold it locally), so 2 replicas no longer fragments the
+  # cache the way it would on the free tier. See CLAUDE.md "Design decisions".
+  #
+  # StatefulSet, not Deployment: clustering's static `peers` list needs stable
+  # per-pod network identity (Orca has no k8s-native peer discovery, only a
+  # static peers list or EC2 auto-discovery), and MSE4 persistence needs each
+  # replica to own its own disk-backed store, not a shared/multi-attach volume.
+  # volumeClaimTemplates below gives each pod (orca-0, orca-1) its own PVC.
+  serviceName: orca-cluster
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orca
+  template:
+    metadata:
+      labels:
+        app: orca
+      annotations:
+        # Picked up by the "kubernetes-pods" scrape job in prometheus-config —
+        # that job filters on these three pod annotations specifically.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9464"
+        prometheus.io/path: "/metrics"
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - k3s-master01
+                - k3s-node2-nuc
+                # k3s-node3-debian excluded: k3s version skew (v1.34.3 agent
+                # vs v1.33.6 server) — unsupported combination.
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          # Hard requirement: the 2 replicas must never land on the same node,
+          # or clustering's resilience story (survive losing one node) is fake.
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - orca
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: orca
+        image: varnish/orca:latest
+        imagePullPolicy: IfNotPresent
+        args: ["--config", "/app/config.yaml"]
+        ports:
+        - name: http
+          containerPort: 80
+        - name: metrics
+          containerPort: 9464
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+          readOnly: true
+        - name: rulesets
+          mountPath: /etc/orca-rulesets
+          readOnly: true
+        - name: orca-license
+          mountPath: /etc/orca/
+          readOnly: true
+        - name: mse-storage
+          mountPath: /var/lib/orca-mse
+        resources:
+          requests:
+            memory: "3Gi"
+            cpu: "250m"
+          limits:
+            # Bumped from 5Gi: clustering + MSE4 metadata overhead on top of the
+            # existing firewall RSS budget. Verify against real RSS once running
+            # rather than trust this number -- see results/notes.md.
+            memory: "6Gi"
+        readinessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 20
+      volumes:
+      - name: config
+        configMap:
+          name: orca-config
+      - name: rulesets
+        configMap:
+          name: orca-firewall-rulesets
+      - name: orca-license
+        secret:
+          # Previously created out-of-band and undocumented in the repo (found
+          # 2026-09-24: kubectl -n orca get secrets showed it already existed
+          # with no matching manifest). scripts/02-deploy.sh now creates it
+          # idempotently from license.lic if missing, so a fresh checkout works.
+          secretName: orca-license
+  volumeClaimTemplates:
+  - metadata:
+      name: mse-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-path
+      resources:
+        requests:
+          # Headroom above the configured 15G store (size + book_size need to
+          # fit, plus filesystem overhead) -- local-path doesn't support online
+          # expansion, so this is deliberately generous rather than tight.
+          storage: 22Gi
