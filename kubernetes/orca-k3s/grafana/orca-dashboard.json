@@ -1,0 +1,138 @@
+{
+  "title": "Varnish Orca — registry offload",
+  "uid": "orca-offload",
+  "tags": ["orca", "varnish", "registry"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Cache hit ratio",
+      "description": "Real metric names, confirmed live via scripts/06-discover-metrics.sh 2026-09-24",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(varnish_main_cache_hits[5m])) / (sum(rate(varnish_main_cache_hits[5m])) + sum(rate(varnish_main_cache_misses[5m])))",
+          "legendFormat": "hit ratio"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Bytes served to clients vs fetched from origin",
+      "description": "No native 'cache bytes' counter exists. 'client response bytes' includes hits+misses; 'backend fetch bytes' fires only on a miss. Compare the two lines rather than reading either as pure cache traffic. NOTE: varnish_backend_response_bodybytes (the obvious-sounding name) is ALWAYS 0 for Docker Hub -- confirmed 2026-09-24. Docker Hub's blob storage redirects to a CDN, and Orca follows that via vmod_goto, so the real bytes land under backend_name=\"goto\" in the byte_sum histogram, not under the named dockerhub_dir_1/2 backends. Use varnish_backend_response_bytes_byte_sum{byte_type=\"body\"} instead.",
+      "gridPos": { "h": 6, "w": 18, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "Bps" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(varnish_main_response_bodybytes[5m]))",
+          "legendFormat": "to clients (hits + misses)"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(varnish_backend_response_bytes_byte_sum{byte_type=\"body\"}[5m]))",
+          "legendFormat": "from origin (misses only)"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Origin request rate by registry",
+      "description": "Should drop sharply once the cache is warm. 'vcl' label is Orca's per-registry VCL group (dockerhub_g1, npmjs_g1, ...).",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (vcl) (rate(varnish_backend_requests[5m]))",
+          "legendFormat": "{{vcl}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Fetch latency — client-facing vs origin",
+      "description": "No pure hit-only histogram exists. Backend ttfb only fires on a miss (a real proxy for origin latency); client ttfb blends hits+misses (mostly hits once warm).",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(varnish_client_duration_ttfb_seconds_bucket[5m])))",
+          "legendFormat": "p95 client-facing (mostly hits once warm)"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(varnish_backend_duration_ttfb_seconds_bucket[5m])))",
+          "legendFormat": "p95 origin fetch (miss only)"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Firewall verdicts by action",
+      "description": "instrumentation scope artifact-firewall. Confirmed live 2026-09-24 with real traffic from the npm firewall testing sessions.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (action) (rate(firewall_requests_total[5m]))",
+          "legendFormat": "{{action}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Top firewall rules firing",
+      "description": "Which specific rule_id is deciding traffic -- lab rules (LAB-000x) vs real OSV advisories (GHSA-.../MAL-...) vs 'default'.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, sum by (rule_id) (rate(firewall_requests_total[5m])))",
+          "legendFormat": "{{rule_id}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Ruleset health",
+      "description": "Rules/rulesets currently loaded (gauges) and reload attempts by status. A drop to 0 on either gauge without a matching config change is worth investigating -- see the OSV startup-race finding in results/notes.md 2026-09-19.",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "firewall_rules_loaded",
+          "legendFormat": "rules loaded"
+        },
+        {
+          "refId": "B",
+          "expr": "firewall_rulesets_loaded",
+          "legendFormat": "rulesets loaded"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (status) (rate(firewall_ruleset_reloads_total[5m]))",
+          "legendFormat": "reloads/{{status}}"
+        }
+      ]
+    }
+  ]
+}

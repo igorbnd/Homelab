@@ -1,0 +1,19 @@
+# Install to /etc/rancher/k3s/registries.yaml on EVERY node, then restart k3s.
+# Agents first (systemctl restart k3s-agent), server last (systemctl restart k3s).
+#
+# k3s appends the upstream registry as a fallback endpoint after the mirrors.
+# Verify this rather than assume it -- see scripts/04-verify.sh.
+mirrors:
+  docker.io:
+    endpoint:
+      - "http://dockerhub.orca.lan"
+  registry.k8s.io:
+    endpoint:
+      - "http://k8s.orca.lan"
+  ghcr.io:
+    endpoint:
+      - "http://ghcr.orca.lan"
+#  quay.io:
+#    endpoint:
+#      - "http://quay.orca.lan"
+

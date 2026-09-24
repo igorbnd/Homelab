@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus
+  namespace: nexus
+  labels:
+    app: nexus
+spec:
+  # 1 replica, ephemeral data dir: this is a comparison sandbox, not a production
+  # candidate (that's Orca). Config is lost on restart -- scripts/nexus/01-configure-repos.sh
+  # is idempotent and meant to be re-run after any restart, same pattern as Orca's
+  # "pod restart empties the cache, expected not a bug".
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nexus
+  template:
+    metadata:
+      labels:
+        app: nexus
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - k3s-node2-nuc
+                # Lighter JVM footprint than JFrog Pro, placed alongside Orca on
+                # node2 rather than master01 to spread load across the two 16Gi
+                # nodes -- see results/notes.md 2026-09-24 resource check.
+      containers:
+      - name: nexus
+        image: sonatype/nexus3:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: INSTALL4J_ADD_VM_PARAMS
+          value: "-Xms1200m -Xmx1200m -XX:MaxDirectMemorySize=2g"
+        ports:
+        - name: http
+          containerPort: 8081
+        - name: docker-proxy
+          containerPort: 8083
+        volumeMounts:
+        - name: nexus-data
+          mountPath: /nexus-data
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "250m"
+          limits:
+            memory: "4Gi"
+        readinessProbe:
+          httpGet:
+            path: /service/rest/v1/status
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          failureThreshold: 10
+        livenessProbe:
+          tcpSocket:
+            port: 8081
+          initialDelaySeconds: 90
+          periodSeconds: 20
+      volumes:
+      - name: nexus-data
+        emptyDir: {}

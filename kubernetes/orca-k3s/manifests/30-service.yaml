@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: orca
+  namespace: orca
+  labels:
+    app: orca
+  annotations:
+    # Plural form — the current MetalLB annotation. Pins the address so it
+    # survives Service recreation; without it, containerd's registries.yaml
+    # on all three nodes could end up pointing at a stale IP.
+    # PLACEHOLDER_LB_IP -- rewritten by scripts/02-deploy.sh from .env
+    metallb.universe.tf/loadBalancerIPs: "10.0.0.10"
+spec:
+  type: LoadBalancer
+  selector:
+    app: orca
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  - name: metrics
+    port: 9464
+    targetPort: 9464
+    protocol: TCP

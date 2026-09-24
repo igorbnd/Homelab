@@ -1,0 +1,6 @@
+.env
+results/
+license
+*.lic
+.DS_Store
+.rendered*/
