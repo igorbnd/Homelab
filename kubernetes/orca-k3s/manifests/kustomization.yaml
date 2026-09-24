@@ -1,0 +1,20 @@
+# Kustomize base for ArgoCD (argocd/orca-application.yaml points here).
+# Scope: Orca only -- manifests/jfrog/ and manifests/nexus/ are deliberately
+# excluded. Both are throwaway, direct-pull comparison rigs (CLAUDE.md
+# "Comparison scope"), not production candidates; continuous reconciliation
+# doesn't add anything for tools meant to be stood up and torn down, and
+# they're deployed via their own scripts/{jfrog,nexus}/00-deploy.sh instead.
+#
+# Two Secrets are deliberately NOT listed here and never will be:
+# orca-license and orca-cluster-token. Neither is git-tracked; both are
+# created once, out-of-band, by scripts/02-deploy.sh (same idempotent
+# create-if-missing pattern for both). Because they're absent from this
+# Kustomize source entirely, ArgoCD's Application never sees them as part of
+# this app and won't try to manage, diff, or prune them.
+resources:
+- 00-namespace.yaml
+- 10-configmap.yaml
+- 15-firewall-rulesets.yaml
+- 20-statefulset.yaml
+- 25-headless-service.yaml
+- 30-service.yaml

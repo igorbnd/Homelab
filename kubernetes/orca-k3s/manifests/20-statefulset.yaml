@@ -60,7 +60,12 @@ spec:
       - name: orca
         image: varnish/orca:latest
         imagePullPolicy: IfNotPresent
-        args: ["--config", "/app/config.yaml"]
+        # Colon-separated: Orca merges multiple config files (confirmed via
+        # github.com/varnish/orca/blob/main/docs/installation.md, and verified
+        # empirically on a throwaway pod 2026-09-24 -- it's a real deep merge of
+        # the cluster: map, not one file replacing the other). This is what lets
+        # the cluster token live outside the git-tracked ConfigMap entirely.
+        args: ["--config", "/app/config.yaml:/app/cluster-secret.yaml"]
         ports:
         - name: http
           containerPort: 80
@@ -76,6 +81,10 @@ spec:
           readOnly: true
         - name: orca-license
           mountPath: /etc/orca/
+          readOnly: true
+        - name: cluster-secret
+          mountPath: /app/cluster-secret.yaml
+          subPath: cluster-secret.yaml
           readOnly: true
         - name: mse-storage
           mountPath: /var/lib/orca-mse
@@ -112,6 +121,13 @@ spec:
           # with no matching manifest). scripts/02-deploy.sh now creates it
           # idempotently from license.lic if missing, so a fresh checkout works.
           secretName: orca-license
+      - name: cluster-secret
+        secret:
+          # Not git-tracked, not owned by ArgoCD (excluded via Application
+          # ignoreDifferences / simply never present in the Kustomize source).
+          # Created idempotently by scripts/02-deploy.sh, same pattern as
+          # orca-license -- see results/notes.md 2026-09-24.
+          secretName: orca-cluster-token
   volumeClaimTemplates:
   - metadata:
       name: mse-storage

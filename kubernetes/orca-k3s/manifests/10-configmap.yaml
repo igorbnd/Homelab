@@ -35,16 +35,21 @@ data:
         prometheus_host: 0.0.0.0
         prometheus_port: 9464
 
-    # Premium clustering (addons: sup-clustering). token is templated in by
-    # scripts/02-deploy.sh at deploy time -- never commit a real value, same
-    # pattern as PROM_OTLP_ENDPOINT and the LB IP. peers use the headless
-    # Service's stable per-pod DNS names (manifests/25-headless-service.yaml),
-    # which only exist because Orca is a StatefulSet, not a Deployment, now.
-    # storage_replicas: 2 = full replication across both peers -- with only 2
-    # nodes eligible (node3 excluded, version skew), this is what makes the
-    # resilience demo (kill one pod, other still serves cached content) real.
+    # Premium clustering (addons: sup-clustering). token deliberately NOT here --
+    # it lives in a separate file, orca-cluster-token/cluster-secret.yaml, sourced
+    # from a Secret created out-of-band by scripts/02-deploy.sh (never git-tracked,
+    # same pattern as orca-license) and merged in via the colon-separated --config
+    # flag on the StatefulSet. Confirmed 2026-09-24 on a throwaway pod that Orca
+    # deep-merges the cluster: map across files rather than one replacing the
+    # other -- this ConfigMap is safe for GitOps/ArgoCD to own outright; the token
+    # Secret isn't managed by ArgoCD at all.
+    # peers use the headless Service's stable per-pod DNS names
+    # (manifests/25-headless-service.yaml), which only exist because Orca is a
+    # StatefulSet, not a Deployment, now. storage_replicas: 2 = full replication
+    # across both peers -- with only 2 nodes eligible (node3 excluded, version
+    # skew), this is what makes the resilience demo (kill one pod, other still
+    # serves cached content) real.
     cluster:
-      token: PLACEHOLDER_CLUSTER_TOKEN
       storage_replicas: 2
       peers:
       - url: http://orca-0.orca-cluster.orca.svc.cluster.local:80

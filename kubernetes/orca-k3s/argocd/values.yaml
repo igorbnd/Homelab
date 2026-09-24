@@ -1,0 +1,17 @@
+# Helm values for argo/argo-cd (chart repo: https://argoproj.github.io/argo-helm).
+# Homelab-scale install: no HA, plain HTTP through the existing Traefik ingress
+# (this cluster's first Ingress resource -- verify it actually routes before
+# trusting this, see results/notes.md).
+
+configs:
+  params:
+    # No TLS termination here -- same "plain HTTP on the LAN, fine for a lab"
+    # posture as Orca itself. Without this, the server redirects to HTTPS
+    # internally and the plain-HTTP Ingress below loops.
+    server.insecure: true
+
+server:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hostname: argocd.orca.lan
