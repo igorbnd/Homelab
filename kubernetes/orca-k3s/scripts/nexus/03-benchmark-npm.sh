@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cold/warm npm install through Nexus's npm-proxy repo. Run from this machine --
-# npm packages are small enough that Wi-Fi bandwidth isn't the confound it was
-# for docker images (see results/notes.md 2026-09-24).
+# npm packages are small enough that Wi-Fi bandwidth isn't the confound it is
+# for docker images.
 source "$(dirname "${BASH_SOURCE[0]}")/../_lib.sh"
 
 PKG="${1:-ms@2.1.3}"

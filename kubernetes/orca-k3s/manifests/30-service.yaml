@@ -5,12 +5,13 @@ metadata:
   namespace: orca
   labels:
     app: orca
-  annotations:
-    # Plural form — the current MetalLB annotation. Pins the address so it
-    # survives Service recreation; without it, containerd's registries.yaml
-    # on all three nodes could end up pointing at a stale IP.
-    # PLACEHOLDER_LB_IP -- rewritten by scripts/02-deploy.sh from .env
-    metallb.universe.tf/loadBalancerIPs: "10.0.0.10"
+  # No metallb.universe.tf/loadBalancerIPs annotation here on purpose. It's a
+  # real per-environment value I never commit, and ArgoCD's ignoreDifferences
+  # + RespectIgnoreDifferences doesn't reliably survive a sync for annotations
+  # (learned this the hard way -- see results/notes.md). Keeping the key
+  # entirely out of the tracked manifest is the only pattern that actually
+  # holds: scripts/02-deploy.sh sets it via `kubectl annotate` as a separate
+  # step after applying this file, so ArgoCD never has an opinion on it.
 spec:
   type: LoadBalancer
   selector:

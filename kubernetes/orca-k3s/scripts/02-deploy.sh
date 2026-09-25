@@ -6,9 +6,6 @@ RENDER_DIR="$REPO_ROOT/.rendered"
 rm -rf "$RENDER_DIR"; mkdir -p "$RENDER_DIR"
 cp "$REPO_ROOT"/manifests/*.yaml "$RENDER_DIR/"
 
-info "Rendering with ORCA_LB_IP=$ORCA_LB_IP"
-sed -i.bak "s|metallb.universe.tf/loadBalancerIPs: .*|metallb.universe.tf/loadBalancerIPs: $ORCA_LB_IP|" "$RENDER_DIR/30-service.yaml"
-
 info "Rendering with PROM_OTLP_ENDPOINT=$PROM_OTLP_ENDPOINT"
 sed -i.bak "s|endpoint: http://prometheus-operated.*|endpoint: $PROM_OTLP_ENDPOINT|" "$RENDER_DIR/10-configmap.yaml"
 
@@ -29,7 +26,7 @@ info "Applying namespace + license Secret"
 kubectl apply -f "$RENDER_DIR/00-namespace.yaml"
 if ! kubectl -n "$ORCA_NAMESPACE" get secret orca-license >/dev/null 2>&1; then
   LICENSE_FILE="${ORCA_LICENSE_FILE:-$REPO_ROOT/license.lic}"
-  [[ -f "$LICENSE_FILE" ]] || fail "No license file at $LICENSE_FILE (set ORCA_LICENSE_FILE). This Secret was previously created out-of-band and undocumented -- see results/notes.md 2026-09-24."
+  [[ -f "$LICENSE_FILE" ]] || fail "No license file at $LICENSE_FILE (set ORCA_LICENSE_FILE)."
   kubectl -n "$ORCA_NAMESPACE" create secret generic orca-license --from-file="license.lic=$LICENSE_FILE"
   ok "created orca-license Secret from $LICENSE_FILE"
 else
@@ -37,11 +34,9 @@ else
 fi
 
 if ! kubectl -n "$ORCA_NAMESPACE" get secret orca-cluster-token >/dev/null 2>&1; then
-  # Not git-tracked, not owned by ArgoCD/Kustomize (absent from manifests/
-  # kustomization.yaml entirely) -- same out-of-band pattern as orca-license.
-  # See results/notes.md 2026-09-24 for why this couldn't just be a field in
-  # the ConfigMap (cluster.token has no file/env-ref alternative), and for the
-  # confirmed-safe fix (Orca deep-merges multiple --config files).
+  # Not git-tracked, not owned by ArgoCD -- same out-of-band pattern as
+  # orca-license. cluster.token has no file/env-ref alternative, so this gets
+  # merged in via Orca's colon-separated --config flag instead.
   CLUSTER_TOKEN="${CLUSTER_TOKEN:-$(openssl rand -hex 24)}"
   kubectl -n "$ORCA_NAMESPACE" create secret generic orca-cluster-token \
     --from-literal="cluster-secret.yaml=cluster:
@@ -57,6 +52,9 @@ kubectl apply -f "$RENDER_DIR/15-firewall-rulesets.yaml"
 kubectl apply -f "$RENDER_DIR/25-headless-service.yaml"
 kubectl apply -f "$RENDER_DIR/20-statefulset.yaml"
 kubectl apply -f "$RENDER_DIR/30-service.yaml"
+
+info "Pinning the LB IP (kept out of the tracked manifest -- ArgoCD would fight it, see results/notes.md)"
+kubectl -n "$ORCA_NAMESPACE" annotate svc orca "metallb.universe.tf/loadBalancerIPs=$ORCA_LB_IP" --overwrite
 
 info "Waiting for rollout (StatefulSet rolls pods one at a time)"
 kubectl -n "$ORCA_NAMESPACE" rollout status statefulset/orca --timeout=300s

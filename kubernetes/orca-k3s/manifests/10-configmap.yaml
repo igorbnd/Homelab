@@ -9,18 +9,15 @@ data:
       http:
       - port: 80
       params:
-        # 60% of the 6Gi limit = ~3.6Gi RAM cache. The rest is headroom for the
-        # firewall (~1.2Gi RSS at 228k OSV rules, measured) and MSE4 metadata.
-        # memory_target auto-adjusts to the real cgroup limit at startup regardless
-        # of what's written here -- confirmed in results/notes.md 2026-09-24.
+        # 60% of the 6Gi limit = ~3.6Gi RAM cache. Rest is headroom for the
+        # firewall and MSE4 metadata. Auto-adjusts to the real cgroup limit
+        # at startup regardless of what I write here.
         memory_target: 60%
         workspace_backend: 128k
       storage:
-        # MSE4 persisted storage (Premium, licensed -- addons: sup-persistence).
-        # 15G on disk, bigger than the RAM cache: this is the actual point of MSE4 --
-        # extend the cache past available memory, not just survive a restart.
-        # size must be > book_size + 1G filesystem overhead -- validated on a
-        # throwaway pod first, see results/notes.md 2026-09-24.
+        # 15G on disk, bigger than the RAM cache -- the point of MSE4 is
+        # extending the cache past available memory, not just surviving a
+        # restart. size must be > book_size + 1G filesystem overhead.
         stores:
         - name: mse-store
           path: /var/lib/orca-mse
@@ -35,20 +32,13 @@ data:
         prometheus_host: 0.0.0.0
         prometheus_port: 9464
 
-    # Premium clustering (addons: sup-clustering). token deliberately NOT here --
-    # it lives in a separate file, orca-cluster-token/cluster-secret.yaml, sourced
-    # from a Secret created out-of-band by scripts/02-deploy.sh (never git-tracked,
-    # same pattern as orca-license) and merged in via the colon-separated --config
-    # flag on the StatefulSet. Confirmed 2026-09-24 on a throwaway pod that Orca
-    # deep-merges the cluster: map across files rather than one replacing the
-    # other -- this ConfigMap is safe for GitOps/ArgoCD to own outright; the token
-    # Secret isn't managed by ArgoCD at all.
-    # peers use the headless Service's stable per-pod DNS names
-    # (manifests/25-headless-service.yaml), which only exist because Orca is a
-    # StatefulSet, not a Deployment, now. storage_replicas: 2 = full replication
-    # across both peers -- with only 2 nodes eligible (node3 excluded, version
-    # skew), this is what makes the resilience demo (kill one pod, other still
-    # serves cached content) real.
+    # token deliberately NOT here -- it's in orca-cluster-token (a Secret, not
+    # git-tracked, same pattern as orca-license), merged in via the
+    # colon-separated --config flag. Orca deep-merges cluster: across files,
+    # so this stays safe for ArgoCD to own outright.
+    # storage_replicas: 2 = full replication across both peers -- with only 2
+    # nodes eligible, this is what makes the resilience demo (kill one pod,
+    # other still serves) real.
     cluster:
       storage_replicas: 2
       peers:

@@ -6,9 +6,8 @@ metadata:
   labels:
     app: nexus
   annotations:
-    # Pinned so it doesn't drift across Service recreation, same rationale as
-    # the Orca Service. Not wired into any containerd mirror config though --
-    # this is a direct-pull comparison target, not a production candidate.
+    # Pinned so it doesn't drift across Service recreation. Not wired into
+    # containerd -- direct-pull comparison target, not a production candidate.
     # PLACEHOLDER_LB_IP -- rewritten by scripts/nexus/00-deploy.sh from .env
     metallb.universe.tf/loadBalancerIPs: "10.0.0.11"
 spec:

@@ -1,26 +1,18 @@
 # Grafana dashboard
 
-`orca-dashboard.json` is a **skeleton**. The panel queries contain `TODO_` markers
-rather than invented metric names.
+`orca-dashboard.json` has 7 panels, all wired to real metric names pulled from a live
+instance via `scripts/06-discover-metrics.sh` -- no `TODO_` placeholders.
 
-This is deliberate. Orca's exact exported series depend on the version and on
-whether you use the OTLP push or Prometheus scrape exporter, and guessing metric
-names produces a dashboard that renders four empty panels.
+Cache: hit ratio, bytes to clients vs origin, origin request rate by registry, fetch
+latency. Firewall: verdicts by action, top rules firing, ruleset health.
 
-To fill it in:
+If the metric names ever need re-verifying (new Orca version, different exporter mode):
 
 1. Deploy Orca and let it serve some traffic (`scripts/05-benchmark.sh`).
-2. Run `scripts/06-discover-metrics.sh` -- it lists the series actually present
-   in Prometheus and writes them to `results/orca-metric-names.txt`.
-3. Replace each `TODO_` placeholder with the real metric name.
+2. Run `scripts/06-discover-metrics.sh` -- lists the series actually present in
+   Prometheus, writes them to `results/orca-metric-names.txt`.
+3. Diff against what's in the dashboard queries before trusting either.
 
-The four panels to build, in priority order:
-
-| Panel | What it shows | Why it matters |
-|---|---|---|
-| Cache hit ratio | hits / (hits + misses), as a percentage | The headline number |
-| Cache vs origin bytes | bytes served from cache against bytes fetched upstream | The offload story in one graph |
-| Origin request rate | requests reaching the upstream registry | Should fall sharply after warm-up |
-| Fetch latency | hit latency against origin-fetch latency | Makes the speed claim concrete |
-
-Keep it to four panels. A focused dashboard screenshots far better than a busy one.
+Don't guess metric names to make a panel look finished -- two of the ones in here
+looked obvious and were wrong (`varnish_backend_response_bodybytes` is always 0 for
+Docker Hub; see the panel's own description for why).
