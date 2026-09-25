@@ -6,17 +6,14 @@ metadata:
   labels:
     app: orca
 spec:
-  # 2 replicas, Premium clustering (addons: sup-clustering, licensed -- verified
-  # 2026-09-24). This SUPERSEDES the old single-replica free-tier reasoning: with
-  # clustering, either replica can serve any cached object (proxied through the
-  # mesh if it doesn't hold it locally), so 2 replicas no longer fragments the
-  # cache the way it would on the free tier. See CLAUDE.md "Design decisions".
+  # 2 replicas with Premium clustering: either replica can serve any cached
+  # object via the mesh, so this no longer fragments the cache the way plain
+  # multi-replica would. See CLAUDE.md "Design decisions".
   #
-  # StatefulSet, not Deployment: clustering's static `peers` list needs stable
-  # per-pod network identity (Orca has no k8s-native peer discovery, only a
-  # static peers list or EC2 auto-discovery), and MSE4 persistence needs each
-  # replica to own its own disk-backed store, not a shared/multi-attach volume.
-  # volumeClaimTemplates below gives each pod (orca-0, orca-1) its own PVC.
+  # StatefulSet, not Deployment: clustering's static peers list needs stable
+  # per-pod network identity, and MSE4 persistence needs each replica to own
+  # its own disk-backed store. volumeClaimTemplates below gives orca-0/orca-1
+  # each their own PVC.
   serviceName: orca-cluster
   replicas: 2
   selector:
@@ -60,11 +57,8 @@ spec:
       - name: orca
         image: varnish/orca:latest
         imagePullPolicy: IfNotPresent
-        # Colon-separated: Orca merges multiple config files (confirmed via
-        # github.com/varnish/orca/blob/main/docs/installation.md, and verified
-        # empirically on a throwaway pod 2026-09-24 -- it's a real deep merge of
-        # the cluster: map, not one file replacing the other). This is what lets
-        # the cluster token live outside the git-tracked ConfigMap entirely.
+        # Colon-separated: Orca deep-merges multiple config files, which is
+        # what lets the cluster token live outside the git-tracked ConfigMap.
         args: ["--config", "/app/config.yaml:/app/cluster-secret.yaml"]
         ports:
         - name: http
@@ -93,9 +87,8 @@ spec:
             memory: "3Gi"
             cpu: "250m"
           limits:
-            # Bumped from 5Gi: clustering + MSE4 metadata overhead on top of the
-            # existing firewall RSS budget. Verify against real RSS once running
-            # rather than trust this number -- see results/notes.md.
+            # 6Gi: clustering + MSE4 metadata overhead on top of the firewall
+            # RSS budget. Check real RSS after deploying, don't just trust this.
             memory: "6Gi"
         readinessProbe:
           tcpSocket:
@@ -116,17 +109,13 @@ spec:
           name: orca-firewall-rulesets
       - name: orca-license
         secret:
-          # Previously created out-of-band and undocumented in the repo (found
-          # 2026-09-24: kubectl -n orca get secrets showed it already existed
-          # with no matching manifest). scripts/02-deploy.sh now creates it
-          # idempotently from license.lic if missing, so a fresh checkout works.
+          # scripts/02-deploy.sh creates this idempotently from license.lic
+          # if missing -- not git-tracked.
           secretName: orca-license
       - name: cluster-secret
         secret:
-          # Not git-tracked, not owned by ArgoCD (excluded via Application
-          # ignoreDifferences / simply never present in the Kustomize source).
-          # Created idempotently by scripts/02-deploy.sh, same pattern as
-          # orca-license -- see results/notes.md 2026-09-24.
+          # Not git-tracked, not owned by ArgoCD -- absent from the Kustomize
+          # source entirely. Created idempotently by scripts/02-deploy.sh.
           secretName: orca-cluster-token
   volumeClaimTemplates:
   - metadata:
@@ -136,7 +125,6 @@ spec:
       storageClassName: local-path
       resources:
         requests:
-          # Headroom above the configured 15G store (size + book_size need to
-          # fit, plus filesystem overhead) -- local-path doesn't support online
-          # expansion, so this is deliberately generous rather than tight.
+          # Headroom above the 15G store -- local-path doesn't support online
+          # expansion, so I'm generous rather than tight here.
           storage: 22Gi

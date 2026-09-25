@@ -1,17 +1,12 @@
 #!/usr/bin/env bash
 # The headline demo: one origin fetch serves every node.
 #
-# IMPORTANT: `ctr images pull` is a low-level debug tool that does NOT read
-# k3s's generated hosts.toml (the actual mirror config) unless told to via
-# --hosts-dir -- confirmed 2026-09-24 by timestamp: a bare `ctr pull` produced
-# zero Orca log/metric activity despite a real, measurable network fetch. Only
-# real kubelet/CRI-driven pod pulls honour the mirror automatically. Without
-# --hosts-dir below, this script silently measures raw internet speed with
-# Orca fully bypassed -- see results/notes.md 2026-09-24.
+# `ctr images pull` doesn't read k3s's generated hosts.toml unless told to via
+# --hosts-dir -- only kubelet/CRI-driven pod pulls honour the mirror
+# automatically. Without --hosts-dir this silently measures raw internet
+# speed with Orca fully bypassed.
 #
-# Also: this cluster's ctr build has no `-q` flag (removed/renamed in this
-# containerd version -- errors "flag provided but not defined: -q"). Redirect
-# stdout instead of relying on a quiet flag that may not exist.
+# This cluster's ctr build also has no `-q` flag -- redirecting stdout instead.
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 
 CTR_HOSTS_DIR="/var/lib/rancher/k3s/agent/etc/containerd/certs.d"
@@ -26,8 +21,7 @@ OUT="$RESULTS_DIR/benchmark-$STAMP.txt"
 } | tee "$OUT"
 
 info "Clearing the image from every node (--sync: a plain rm can leave content"
-info "blobs behind if another tag shares them, producing a false 'warm' number --"
-info "see results/notes.md 2026-09-24)"
+info "blobs behind if another tag shares them, producing a false 'warm' number)"
 for node in $NODES; do
   ssh "$node" "sudo ctr -n k8s.io images rm --sync $BENCH_IMAGE >/dev/null 2>&1 || true"
 done

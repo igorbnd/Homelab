@@ -20,4 +20,4 @@ curl -s 'http://127.0.0.1:19090/api/v1/label/__name__/values' \
 
 echo
 ok "Metric names saved to results/orca-metric-names.txt"
-echo "Use these to fill in the TODO queries in grafana/orca-dashboard.json"
+echo "Diff against grafana/orca-dashboard.json's queries if re-verifying."

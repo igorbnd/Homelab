@@ -2,15 +2,13 @@
 # Cold/warm docker pull through Nexus's docker-hub-proxy repo.
 # Runs via ctr on a wired cluster node (BENCH_NODE), NOT from this machine --
 # a laptop-over-Wi-Fi pull is bandwidth-bound regardless of cache hit/miss for
-# any reasonably large image, which is exactly what hid the real signal the
-# first time this ran. See results/notes.md 2026-09-24.
+# any reasonably large image, which hides the real signal.
 #
 # Uses `ctr images rm --sync` to force a real content-store removal before each
 # pull. Even so, this ONLY gives a trustworthy "cold" number if BENCH_IMAGE (and
 # anything sharing its base layers) is genuinely absent from that node's
 # containerd content store beforehand -- verify with `ctr -n k8s.io images ls`
-# if in doubt. See results/notes.md 2026-09-24 for how this bit us with
-# node:latest on k3s-master01 (181 pre-cached images from generate-traffic.sh).
+# if in doubt.
 source "$(dirname "${BASH_SOURCE[0]}")/../_lib.sh"
 
 BENCH_NODE="${BENCH_NODE:-k3s-master01}"

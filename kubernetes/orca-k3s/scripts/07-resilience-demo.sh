@@ -6,9 +6,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 # Bare `ctr images pull` ignores k3s's mirror config entirely -- only kubelet/CRI
 # honours it automatically. Without --hosts-dir this demo would just try
 # docker.io directly and correctly fail during the "outage", proving nothing
-# about Orca. Same root cause as the benchmark script bug -- see
-# results/notes.md 2026-09-24. --sync on rm avoids a false "still cached
-# locally" result from containerd's content-store dedup (also 2026-09-24).
+# about Orca. --sync on rm avoids a false "still cached locally" result from
+# containerd's content-store dedup.
 CTR_HOSTS_DIR="/var/lib/rancher/k3s/agent/etc/containerd/certs.d"
 
 TARGET="${1:-}"

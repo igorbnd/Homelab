@@ -11,7 +11,7 @@
       "id": 1,
       "type": "stat",
       "title": "Cache hit ratio",
-      "description": "Real metric names, confirmed live via scripts/06-discover-metrics.sh 2026-09-24",
+      "description": "Real metric names, confirmed live via scripts/06-discover-metrics.sh",
       "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
       "fieldConfig": {
         "defaults": { "unit": "percentunit", "min": 0, "max": 1 }
@@ -28,7 +28,7 @@
       "id": 2,
       "type": "timeseries",
       "title": "Bytes served to clients vs fetched from origin",
-      "description": "No native 'cache bytes' counter exists. 'client response bytes' includes hits+misses; 'backend fetch bytes' fires only on a miss. Compare the two lines rather than reading either as pure cache traffic. NOTE: varnish_backend_response_bodybytes (the obvious-sounding name) is ALWAYS 0 for Docker Hub -- confirmed 2026-09-24. Docker Hub's blob storage redirects to a CDN, and Orca follows that via vmod_goto, so the real bytes land under backend_name=\"goto\" in the byte_sum histogram, not under the named dockerhub_dir_1/2 backends. Use varnish_backend_response_bytes_byte_sum{byte_type=\"body\"} instead.",
+      "description": "No native 'cache bytes' counter exists. 'client response bytes' includes hits+misses; 'backend fetch bytes' fires only on a miss. Compare the two lines rather than reading either as pure cache traffic. NOTE: varnish_backend_response_bodybytes (the obvious-sounding name) is ALWAYS 0 for Docker Hub -- its blob storage redirects to a CDN, and Orca follows that via vmod_goto, so the real bytes land under backend_name=\"goto\" in the byte_sum histogram, not under the named dockerhub_dir_1/2 backends. Use varnish_backend_response_bytes_byte_sum{byte_type=\"body\"} instead.",
       "gridPos": { "h": 6, "w": 18, "x": 6, "y": 0 },
       "fieldConfig": { "defaults": { "unit": "Bps" } },
       "targets": [
@@ -83,7 +83,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "Firewall verdicts by action",
-      "description": "instrumentation scope artifact-firewall. Confirmed live 2026-09-24 with real traffic from the npm firewall testing sessions.",
+      "description": "instrumentation scope artifact-firewall. Confirmed live with real traffic from npm firewall testing.",
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
       "fieldConfig": { "defaults": { "unit": "reqps" } },
       "targets": [
@@ -113,7 +113,7 @@
       "id": 7,
       "type": "stat",
       "title": "Ruleset health",
-      "description": "Rules/rulesets currently loaded (gauges) and reload attempts by status. A drop to 0 on either gauge without a matching config change is worth investigating -- see the OSV startup-race finding in results/notes.md 2026-09-19.",
+      "description": "Rules/rulesets currently loaded (gauges) and reload attempts by status. A drop to 0 on either gauge without a matching config change is worth investigating -- see the OSV startup-race finding in results/notes.md.",
       "gridPos": { "h": 6, "w": 24, "x": 0, "y": 20 },
       "fieldConfig": { "defaults": { "unit": "short" } },
       "targets": [

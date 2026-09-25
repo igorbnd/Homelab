@@ -6,10 +6,9 @@ metadata:
   labels:
     app: nexus
 spec:
-  # 1 replica, ephemeral data dir: this is a comparison sandbox, not a production
-  # candidate (that's Orca). Config is lost on restart -- scripts/nexus/01-configure-repos.sh
-  # is idempotent and meant to be re-run after any restart, same pattern as Orca's
-  # "pod restart empties the cache, expected not a bug".
+  # 1 replica, ephemeral data dir -- this is a comparison sandbox, not a
+  # production candidate. Config is lost on restart; re-run
+  # scripts/nexus/01-configure-repos.sh after any restart.
   replicas: 1
   strategy:
     type: Recreate
@@ -30,9 +29,8 @@ spec:
                 operator: In
                 values:
                 - k3s-node2-nuc
-                # Lighter JVM footprint than JFrog Pro, placed alongside Orca on
-                # node2 rather than master01 to spread load across the two 16Gi
-                # nodes -- see results/notes.md 2026-09-24 resource check.
+                # Lighter JVM footprint than JFrog Pro -- placed here rather than
+                # master01 to spread load across the two 16Gi nodes.
       containers:
       - name: nexus
         image: sonatype/nexus3:latest

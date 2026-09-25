@@ -1,16 +1,13 @@
-# Helm values for jfrog/artifactory (chart repo: https://charts.jfrog.io).
 # JFrog's own docs point to this Helm chart as the supported self-hosted install
-# path -- see results/notes.md 2026-09-24. Not hand-rolled manifests like Orca/Nexus:
-# Artifactory needs a real DB and init logic the chart already handles correctly.
+# path. Not hand-rolled manifests like Orca/Nexus: Artifactory needs a real DB
+# and init logic the chart already handles correctly.
 #
 # License is NOT in this file. scripts/jfrog/00-deploy.sh creates a Secret from a
 # local *.lic file (gitignored) and passes --set artifactory.license.secret/dataKey.
 #
-# Everything pinned to k3s-master01: most memory headroom of the two eligible
-# nodes (see results/notes.md 2026-09-24 resource check), and local-path storage
-# (not Longhorn) so PVCs stay node-local -- this is throwaway comparison data,
-# not something that needs replication, and node3's small disk makes Longhorn's
-# default 3-way replica placement a bad fit anyway.
+# Pinned to k3s-master01 (most memory headroom of the two eligible nodes).
+# local-path, not Longhorn, so PVCs stay node-local -- throwaway comparison
+# data doesn't need replication, and node3's small disk is a bad fit anyway.
 
 global:
   nodeSelector:
